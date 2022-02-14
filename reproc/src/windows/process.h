@@ -1,6 +1,6 @@
 #pragma once
 
-#include <reproc/error.h>
+#include <reproc/reproc.h>
 
 #include <wchar.h>
 #include <windows.h>

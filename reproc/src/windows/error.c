@@ -1,7 +1,7 @@
 #include <reproc/error.h>
 
 #include <assert.h>
-#include <windows.h>
+#include <Windows.h>
 
 unsigned int reproc_system_error(void)
 {

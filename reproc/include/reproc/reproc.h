@@ -3,7 +3,32 @@
 #include <reproc/error.h>
 #include <reproc/export.h>
 
+#if defined(_MSC_VER) && _MSC_VER < 1800
+
+#if !defined(__bool_true_false_are_defined)
+
+#ifndef __cplusplus
+
+#define false   0
+#define true    1
+#define bool    _Bool
+
+/* For compilers that don't have the builtin _Bool type. */
+#if ((defined(_MSC_VER) && _MSC_VER < 1800) || \
+    (defined __GNUC__&& __STDC_VERSION__ < 199901L && __GNUC__ < 3)) && !defined(_lint)
+typedef unsigned char _Bool;
+#endif
+
+#endif /* !__cplusplus */
+
+#define __bool_true_false_are_defined   1
+
+#endif /* !__bool_true_false_are_defined */
+
+#else
 #include <stdbool.h>
+#endif
+
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -251,7 +276,7 @@ Possible errors:
 REPROC_EXPORT REPROC_ERROR reproc_kill(reproc_t *process);
 
 /*! Used to tell `reproc_stop` how to stop a child process. */
-typedef enum {
+typedef enum REPROC_CLEANUP {
   /*! noop (no operation) */
   REPROC_CLEANUP_NOOP = 0,
   /*! `reproc_wait` */
@@ -276,9 +301,9 @@ the child process to exit.
 
 ```c
 REPROC_ERROR error = reproc_stop(process,
-                                 REPROC_WAIT, 10000,
-                                 REPROC_TERMINATE, 5000,
-                                 REPROC_NOOP, 0);
+                                 REPROC_CLEANUP_WAIT, 10000,
+                                 REPROC_CLEANUP_TERMINATE, 5000,
+                                 REPROC_CLEANUP_NOOP, 0);
 ```
 
 Call `reproc_wait`, `reproc_terminate` and `reproc_kill` directly if you need

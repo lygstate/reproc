@@ -1,6 +1,7 @@
 #include <doctest.h>
 
 #include <reproc/reproc.h>
+#include <liblocate/liblocate.h>
 
 #include <array>
 #include <string>
@@ -8,7 +9,8 @@
 void io(const char *program, REPROC_STREAM stream)
 {
   REPROC_ERROR error = REPROC_SUCCESS;
-  INFO(reproc_strerror(error));
+  const char* errorResult = reproc_strerror(error);
+  INFO(errorResult);
 
   reproc_t io;
   std::array<const char *, 2> argv = { program, nullptr };
@@ -27,7 +29,7 @@ void io(const char *program, REPROC_STREAM stream)
   reproc_close(&io, REPROC_STREAM_IN);
 
   std::string output;
-  static constexpr unsigned int BUFFER_SIZE = 1024;
+  static const unsigned int BUFFER_SIZE = 1024;
   std::array<uint8_t, BUFFER_SIZE> buffer = {};
 
   while (true) {
@@ -51,6 +53,9 @@ void io(const char *program, REPROC_STREAM stream)
 
 TEST_CASE("io")
 {
-  io("reproc/resources/stdout", REPROC_STREAM_OUT);
-  io("reproc/resources/stderr", REPROC_STREAM_ERR);
+  std::string stdoutResourcePath = getExecutablePath() + "/../../resources/stdout";
+  std::string stderrResourcePath = getExecutablePath() + "/../../resources/stderr";
+
+  io(stdoutResourcePath.c_str(), REPROC_STREAM_OUT);
+  io(stderrResourcePath.c_str(), REPROC_STREAM_ERR);
 }

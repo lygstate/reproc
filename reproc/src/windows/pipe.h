@@ -1,8 +1,7 @@
 #pragma once
 
-#include <reproc/error.h>
+#include <reproc/reproc.h>
 
-#include <stdbool.h>
 #include <stdint.h>
 #include <windows.h>
 

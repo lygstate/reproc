@@ -2,7 +2,6 @@
 #include "handle.h"
 
 #include <assert.h>
-#include <stdbool.h>
 #include <stdlib.h>
 
 // Argument escaping implementation is based on the following blog post:
@@ -106,7 +105,7 @@ char *argv_join(const char *const *argv)
     }
   }
 
-  char *joined = malloc(sizeof(char) * joined_length);
+  char *joined = (char*)malloc(sizeof(char) * joined_length);
   if (joined == NULL) {
     return NULL;
   }
@@ -140,7 +139,7 @@ char *environment_join(const char *const *environment)
 {
   assert(environment);
 
-  char *joined = malloc(sizeof(char) * environment_join_size(environment));
+  char *joined = (char*)malloc(sizeof(char) * environment_join_size(environment));
   if (joined == NULL) {
     return NULL;
   }
@@ -174,7 +173,7 @@ wchar_t *string_to_wstring(const char *string, size_t size)
 
   // `MultiByteToWideChar` does not return negative values so the cast to
   // `size_t` is safe.
-  wchar_t *wstring = malloc(sizeof(wchar_t) * (size_t) rv);
+  wchar_t *wstring = (wchar_t *)malloc(sizeof(wchar_t) * (size_t) rv);
   if (wstring == NULL) {
     return NULL;
   }
@@ -210,7 +209,7 @@ static handle_inherit_list_create(HANDLE *handles,
     return REPROC_ERROR_SYSTEM;
   }
 
-  LPPROC_THREAD_ATTRIBUTE_LIST attribute_list = malloc(attribute_list_size);
+  LPPROC_THREAD_ATTRIBUTE_LIST attribute_list = (LPPROC_THREAD_ATTRIBUTE_LIST)malloc(attribute_list_size);
   if (!attribute_list) {
     return REPROC_ERROR_SYSTEM;
   }
@@ -279,22 +278,22 @@ REPROC_ERROR process_create(wchar_t *command_line,
 
   creation_flags |= EXTENDED_STARTUPINFO_PRESENT;
 
-  STARTUPINFOEXW extended_startup_info = {
-    .StartupInfo = { .cb = sizeof(extended_startup_info),
-                     .dwFlags = STARTF_USESTDHANDLES,
-                     .hStdInput = options->stdin_handle,
-                     .hStdOutput = options->stdout_handle,
-                     .hStdError = options->stderr_handle },
-    .lpAttributeList = attribute_list
-  };
+  STARTUPINFOEXW extended_startup_info = { 0 };
+  extended_startup_info.StartupInfo.cb = sizeof(extended_startup_info);
+  extended_startup_info.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+  extended_startup_info.StartupInfo.hStdInput = options->stdin_handle;
+  extended_startup_info.StartupInfo.hStdOutput = options->stdout_handle;
+  extended_startup_info.StartupInfo.hStdError = options->stderr_handle;
+  extended_startup_info.lpAttributeList = attribute_list;
 
   LPSTARTUPINFOW startup_info_address = &extended_startup_info.StartupInfo;
 #else
-  STARTUPINFOW startup_info = { .cb = sizeof(startup_info),
-                                .dwFlags = STARTF_USESTDHANDLES,
-                                .hStdInput = options->stdin_handle,
-                                .hStdOutput = options->stdout_handle,
-                                .hStdError = options->stderr_handle };
+  STARTUPINFOW startup_info = { 0 };
+  startup_info.cb = sizeof(startup_info);
+  startup_info.dwFlags = STARTF_USESTDHANDLES;
+  startup_info.hStdInput = options->stdin_handle;
+  startup_info.hStdOutput = options->stdout_handle;
+  startup_info.hStdError = options->stderr_handle;
 
   LPSTARTUPINFOW startup_info_address = &startup_info;
 #endif
@@ -369,13 +368,40 @@ REPROC_ERROR process_terminate(unsigned long pid)
   return REPROC_SUCCESS;
 }
 
+BOOL EnableDebugPrivilege()
+{
+  HANDLE hToken;
+  BOOL fOk = FALSE;
+  if (OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, &hToken))
+  {
+    TOKEN_PRIVILEGES tp;
+    tp.PrivilegeCount = 1;
+    LookupPrivilegeValue(NULL, SE_DEBUG_NAME, &tp.Privileges[0].Luid);
+    tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+
+    AdjustTokenPrivileges(hToken, FALSE, &tp, sizeof(tp), NULL, NULL);
+
+    fOk = (GetLastError() == ERROR_SUCCESS);
+    CloseHandle(hToken);
+  }
+  return fOk;
+}
+
 REPROC_ERROR process_kill(HANDLE process)
 {
   assert(process);
 
+  EnableDebugPrivilege();
+
   // We use 137 as the exit status because it is the same exit status as a
   // process that is stopped with the `SIGKILL` signal on POSIX systems.
   if (!TerminateProcess(process, 137)) {
+    DWORD error = GetLastError();
+    DWORD wait_result = WaitForSingleObject(process, 0);
+    if (error == ERROR_ACCESS_DENIED && wait_result == WAIT_OBJECT_0)
+    {
+      return REPROC_SUCCESS;
+    }
     return REPROC_ERROR_SYSTEM;
   }
 

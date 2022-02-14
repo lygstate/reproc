@@ -17,6 +17,8 @@ REPROC_ERROR reproc_start(reproc_t *process,
   assert(argv);
   assert(argv[0] != NULL);
 
+  memset(process, 0, sizeof(process[0]));
+
   process->running = false;
 
   // Predeclare every variable so we can use `goto`.
@@ -93,11 +95,11 @@ REPROC_ERROR reproc_start(reproc_t *process,
   }
 
   struct process_options options = {
-    .environment = environment_line_wstring,
-    .working_directory = working_directory_wstring,
-    .stdin_handle = child_stdin,
-    .stdout_handle = child_stdout,
-    .stderr_handle = child_stderr
+    /* .environment = */ environment_line_wstring,
+    /* .working_directory = */ working_directory_wstring,
+    /* .stdin_handle = */ child_stdin,
+    /* .stdout_handle = */ child_stdout,
+    /* .stderr_handle = */ child_stderr
   };
 
   error = process_create(command_line_wstring, &options, &process->id,
@@ -209,7 +211,7 @@ REPROC_ERROR reproc_terminate(reproc_t *process)
 {
   assert(process);
 
-  if (!process->running) {
+  if (!reproc_running(process)) {
     return REPROC_SUCCESS;
   }
 
@@ -220,7 +222,7 @@ REPROC_ERROR reproc_kill(reproc_t *process)
 {
   assert(process);
 
-  if (!process->running) {
+  if (!reproc_running(process)) {
     return REPROC_SUCCESS;
   }
 

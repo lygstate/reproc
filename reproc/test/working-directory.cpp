@@ -1,6 +1,7 @@
 #include <doctest.h>
 
 #include <reproc/reproc.h>
+#include <liblocate/liblocate.h>
 
 #include <array>
 
@@ -9,12 +10,14 @@ TEST_CASE("working-directory")
   reproc_t noop;
 
   REPROC_ERROR error = REPROC_SUCCESS;
-  INFO(reproc_strerror(error));
+  const char* errorResult = reproc_strerror(error);
+  INFO(errorResult);
 
-  const char *working_directory = "reproc/resources";
-  std::array<const char *, 2> argv{ "reproc/resources/noop", nullptr };
+  std::string working_directory = getExecutablePath() + "/../../resources";
+  std::string noopResourcePath = getExecutablePath() + "/../../resources/noop";
+  std::array<const char *, 2> argv = { noopResourcePath.c_str(), nullptr };
 
-  error = reproc_start(&noop, argv.data(), nullptr, working_directory);
+  error = reproc_start(&noop, argv.data(), nullptr, working_directory.c_str());
   REQUIRE(!error);
 
   error = reproc_wait(&noop, REPROC_INFINITE);

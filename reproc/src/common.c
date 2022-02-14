@@ -14,8 +14,6 @@ REPROC_ERROR reproc_stop(reproc_t *process,
                          REPROC_CLEANUP c3,
                          unsigned int t3)
 {
-  assert(process);
-
   REPROC_CLEANUP operations[3] = { c1, c2, c3 };
   unsigned int timeouts[3] = { t1, t2, t3 };
 
@@ -24,6 +22,7 @@ REPROC_ERROR reproc_stop(reproc_t *process,
   // to `REPROC_SUCCESS`).
   REPROC_ERROR error = REPROC_ERROR_WAIT_TIMEOUT;
 
+  assert(process);
   for (int i = 0; i < 3; i++) {
     REPROC_CLEANUP operation = operations[i];
     unsigned int timeout = timeouts[i];

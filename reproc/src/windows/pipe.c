@@ -5,9 +5,9 @@
 
 // Ensures both endpoints of the pipe are inherited by the child process.
 static SECURITY_ATTRIBUTES security_attributes = {
-  .nLength = sizeof(SECURITY_ATTRIBUTES),
-  .bInheritHandle = TRUE,
-  .lpSecurityDescriptor = NULL
+  /*.nLength = */sizeof(SECURITY_ATTRIBUTES),
+  /* .lpSecurityDescriptor = */ NULL,
+  /* .bInheritHandle = */TRUE,
 };
 
 // Disables a single endpoint of a pipe from being inherited by the child

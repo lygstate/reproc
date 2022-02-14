@@ -296,10 +296,10 @@ wait_timeout(pid_t pid, unsigned int timeout, unsigned int *exit_status)
 
   // MacOS does not support `sigtimedwait` so we use `kqueue` instead.
 #if defined(__APPLE__)
-  int queue = kqueue();
-  struct kevent event;
-  EV_SET(&event, SIGCHLD, EVFILT_SIGNAL, EV_ADD, 0, 0, NULL);
-  kevent(queue, &event, 1, NULL, 0, NULL);
+  int kq = kqueue();
+  struct kevent ke;
+  EV_SET(&ke, SIGCHLD, EVFILT_SIGNAL, EV_ADD, 0, 0, NULL);
+  kevent(kq, &ke, 1, NULL, 0, NULL);
 #endif
 
   while (true) {
@@ -316,19 +316,18 @@ wait_timeout(pid_t pid, unsigned int timeout, unsigned int *exit_status)
     }
 
 #if defined(__APPLE__)
-    rv = kevent(queue, NULL, 0, &event, 1, &remaining);
+    rv = kevent(kq, NULL, 0, &ke, 1, &remaining);
 
-    // Convert `kqueue` timeout error to `sigtimedwait` timeout error.
+    // Convert `kqueue` timeout to `sigtimedwait` timeout.
     if (rv == 0) {
       rv = -1;
       errno = EAGAIN;
     }
 
-    // Translate errors put into the kqueue event list to `rv` and `errno`
-    // errors.
-    if (rv > 0 && event.flags & EV_ERROR) {
+    // Translate errors put into the event list to `rv` and `errno`.
+    if (rv > 0 && ke.flags & EV_ERROR) {
       rv = -1;
-      errno = (int) event.data;
+      errno = (int) ke.data;
     }
 #else
     rv = sigtimedwait(&chld_mask, NULL, &remaining);
@@ -372,7 +371,7 @@ wait_timeout(pid_t pid, unsigned int timeout, unsigned int *exit_status)
 
 cleanup:
 #if defined(__APPLE__)
-  close(queue);
+  close(kq);
 #endif
 
   if (SIGMASK_SAFE(SIG_SETMASK, &old_mask, NULL) == -1) {

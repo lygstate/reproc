@@ -1,6 +1,7 @@
 #include <doctest.h>
 
 #include <reproc/reproc.h>
+#include <liblocate/liblocate.h>
 
 #include <array>
 #include <iterator>
@@ -11,9 +12,11 @@ TEST_CASE("environment")
   reproc_t process;
 
   REPROC_ERROR error = REPROC_SUCCESS;
-  INFO(reproc_strerror(error));
+  const char* errorResult = reproc_strerror(error);
+  INFO(errorResult);
 
-  std::array<const char *, 2> argv = { "reproc/resources/environment",
+  std::string environmentResourcePath = getExecutablePath() + "/../../resources/environment";
+  std::array<const char *, 2> argv = { environmentResourcePath.c_str(),
                                        nullptr };
   std::array<const char *, 3> environment = { "IP=127.0.0.1", "PORT=8080",
                                               nullptr };
@@ -23,7 +26,7 @@ TEST_CASE("environment")
 
   std::string output;
 
-  static constexpr unsigned int BUFFER_SIZE = 1024;
+  static const unsigned int BUFFER_SIZE = 1024;
   std::array<uint8_t, BUFFER_SIZE> buffer = {};
 
   while (true) {

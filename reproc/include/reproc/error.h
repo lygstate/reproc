@@ -13,7 +13,7 @@ if (error) { return error; } // Only executes if reproc_read returns an error.
 ```
 */
 // When editing make sure to change the corresponding enum in error.hpp as well.
-typedef enum {
+typedef enum REPROC_ERROR {
   /*! Indicates a reproc API call was successful. An API function return this
   value if no error occurs during its execution. */
   REPROC_SUCCESS,

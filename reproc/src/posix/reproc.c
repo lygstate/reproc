@@ -18,6 +18,7 @@ REPROC_ERROR reproc_start(reproc_t *process,
   assert(process);
   assert(argv);
   assert(argv[0] != NULL);
+  memset(process, 0, sizeof(process[0]));
 
   process->running = false;
 
