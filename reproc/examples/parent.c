@@ -6,22 +6,23 @@
 // streams of the child process to the standard streams of the parent process.
 int main(int argc, const char **argv)
 {
+  reproc_t *process = NULL;
+  int r = REPROC_ENOMEM;
+  reproc_options options = { 0 };
+
   if (argc <= 1) {
     fprintf(stderr,
             "No arguments provided. Example usage: ./inherit cmake --help");
     return EXIT_FAILURE;
   }
 
-  reproc_t *process = NULL;
-  int r = REPROC_ENOMEM;
-
   process = reproc_new();
   if (process == NULL) {
     goto finish;
   }
 
-  r = reproc_start(process, argv + 1,
-                   (reproc_options){ .redirect.parent = true });
+  options.redirect.parent = true;
+  r = reproc_start(process, argv + 1, options);
   if (r < 0) {
     goto finish;
   }

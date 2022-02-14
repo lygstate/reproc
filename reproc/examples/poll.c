@@ -31,13 +31,15 @@ static int parent(const char *program)
 {
   reproc_event_source children[NUM_CHILDREN] = { { 0 } };
   int r = -1;
+  int i = 0;
 
-  for (int i = 0; i < NUM_CHILDREN; i++) {
+  for (i = 0; i < NUM_CHILDREN; i++) {
     reproc_t *process = reproc_new();
-
+    reproc_options options = { 0 };
     const char *args[] = { program, "child", NULL };
 
-    r = reproc_start(process, args, (reproc_options){ .nonblocking = true });
+    options.nonblocking = true;
+    r = reproc_start(process, args, options);
     if (r < 0) {
       goto finish;
     }
@@ -53,12 +55,12 @@ static int parent(const char *program)
       goto finish;
     }
 
-    for (int i = 0; i < NUM_CHILDREN; i++) {
+    for (i = 0; i < NUM_CHILDREN; i++) {
+      uint8_t output[4096];
       if (children[i].process == NULL || !children[i].events) {
         continue;
       }
 
-      uint8_t output[4096];
       r = reproc_read(children[i].process, REPROC_STREAM_OUT, output,
                       sizeof(output));
       if (r == REPROC_EPIPE) {
@@ -78,7 +80,7 @@ static int parent(const char *program)
   }
 
 finish:
-  for (int i = 0; i < NUM_CHILDREN; i++) {
+  for (i = 0; i < NUM_CHILDREN; i++) {
     reproc_destroy(children[i].process);
   }
 
@@ -91,8 +93,9 @@ finish:
 
 static int child(void)
 {
+  int ms = 0;
   srand(((unsigned int) getpid()));
-  int ms = rand() % NUM_CHILDREN * 4; // NOLINT
+  ms = rand() % NUM_CHILDREN * 4; // NOLINT
   millisleep(ms);
   printf("Process %i slept %i milliseconds.", getpid(), ms);
   return EXIT_SUCCESS;
