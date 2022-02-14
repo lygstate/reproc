@@ -7,9 +7,12 @@
 // before terminating it.
 int main(int argc, const char **argv)
 {
+  int r = -1;
+  reproc_options options = { 0 };
   (void) argc;
 
-  int r = reproc_run(argv + 1, (reproc_options){ .deadline = 5000 });
+  options.deadline = 5000;
+  r = reproc_run(argv + 1, options);
 
   if (r < 0) {
     fprintf(stderr, "%s\n", reproc_strerror(r));

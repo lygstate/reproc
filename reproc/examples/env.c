@@ -7,11 +7,14 @@
 // via the command line are added to the child process environment variables.
 int main(int argc, const char **argv)
 {
-  (void) argc;
-
   const char *args[] = { RESOURCE_DIRECTORY "/env", NULL };
+  int r = -1;
+  reproc_options options = { 0 };
 
-  int r = reproc_run(args, (reproc_options){ .env.extra = argv + 1 });
+  options.env.extra = argv + 1;
+  r = reproc_run(args, options);
+
+  (void) argc;
 
   if (r < 0) {
     fprintf(stderr, "%s\n", reproc_strerror(r));

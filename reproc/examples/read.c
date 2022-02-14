@@ -8,14 +8,14 @@
 // single child process.
 int main(int argc, const char **argv)
 {
-  (void) argc;
-
   // `reproc_t` stores necessary information between calls to reproc's API.
   reproc_t *process = NULL;
   char *output = NULL;
   size_t size = 0;
   int r = REPROC_ENOMEM;
+  reproc_options options = { 0 };
 
+  (void) argc;
   process = reproc_new();
   if (process == NULL) {
     goto finish;
@@ -26,7 +26,7 @@ int main(int argc, const char **argv)
   // child process. If the working directory is `NULL` the working directory of
   // the parent process is used. If the environment is `NULL`, the environment
   // of the parent process is used.
-  r = reproc_start(process, argv + 1, (reproc_options){ 0 });
+  r = reproc_start(process, argv + 1, options);
 
   // On failure, reproc's API functions return a negative `errno` (POSIX) or
   // `GetLastError` (Windows) style error code. To check against common error
@@ -49,19 +49,21 @@ int main(int argc, const char **argv)
   // process closing its output stream is also reported as an error).
   for (;;) {
     uint8_t buffer[4096];
+    size_t bytes_read = 0;
+    char *result = NULL;
     r = reproc_read(process, REPROC_STREAM_OUT, buffer, sizeof(buffer));
     if (r < 0) {
       break;
     }
 
     // On success, `reproc_read` returns the amount of bytes read.
-    size_t bytes_read = (size_t) r;
+    bytes_read = (size_t) r;
 
     // Increase the size of `output` to make sure it can hold the new output.
     // This is definitely not the most performant way to grow a buffer so keep
     // that in mind. Add 1 to size to leave space for the NUL terminator which
     // isn't included in `output_size`.
-    char *result = realloc(output, size + bytes_read + 1);
+    result = realloc(output, size + bytes_read + 1);
     if (result == NULL) {
       r = REPROC_ENOMEM;
       goto finish;

@@ -8,8 +8,9 @@ int main(void)
   char *output = NULL;
   reproc_sink sink = reproc_sink_string(&output);
   int r = -1;
+  reproc_options options = { 0 };
 
-  r = reproc_run_ex(argv, (reproc_options){ 0 }, sink, sink);
+  r = reproc_run_ex(argv, options, sink, sink);
   ASSERT_OK(r);
   ASSERT(output != NULL);
 

@@ -25,7 +25,9 @@ if(REPROC_MULTITHREADED)
 endif()
 
 add_subdirectory(reproc)
-
+if (MSVC AND CMAKE_C_COMPILER_VERSION LESS_EQUAL 1600)
+  set(REPROC++ OFF)
+endif()
 if(REPROC++)
   enable_language(CXX)
   add_subdirectory(reproc++)
