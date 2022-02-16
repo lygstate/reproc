@@ -95,6 +95,7 @@ struct options {
   } env = {};
 
   const char *working_directory = nullptr;
+  bool show_console_window = false;
 
   struct {
     redirect in;

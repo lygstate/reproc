@@ -444,13 +444,16 @@ int process_start(HANDLE *process,
   extended_startup_info.StartupInfo.hStdInput = options.handle.in;
   extended_startup_info.StartupInfo.hStdOutput = options.handle.out;
   extended_startup_info.StartupInfo.hStdError = options.handle.err;
-  extended_startup_info.StartupInfo.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW; // `STARTF_USESTDHANDLES`
+  extended_startup_info.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
   // `STARTF_USESHOWWINDOW`. Make sure the console window of
   // the child process isn't visible. See
   // https://github.com/DaanDeMeyer/reproc/issues/6 and
   // https://github.com/DaanDeMeyer/reproc/pull/7 for more
   // information.
-  extended_startup_info.StartupInfo.wShowWindow = SW_HIDE;
+  if (!options.show_console_window) {
+    extended_startup_info.StartupInfo.dwFlags |= STARTF_USESHOWWINDOW;
+    extended_startup_info.StartupInfo.wShowWindow = SW_SHOWNORMAL;
+  }
   extended_startup_info.lpAttributeList = attribute_list;
 
   startup_info_address = &extended_startup_info.StartupInfo;

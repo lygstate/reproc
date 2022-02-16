@@ -13,6 +13,7 @@ int main(void)
   size_t i = 0;
   reproc_options options = { 0 };
 
+  options.show_console_window = true;
   r = reproc_run_ex(argv, options, sink, sink);
   ASSERT_OK(r);
   ASSERT(output != NULL);

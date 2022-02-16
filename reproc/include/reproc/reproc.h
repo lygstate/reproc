@@ -170,6 +170,12 @@ typedef struct reproc_options {
   */
   const char *working_directory;
 
+  /*!
+  `show_console_window` specifies if a newly create window are used to
+  show the child console.
+  */
+  bool show_console_window;
+
   struct {
     /*!
     `behavior` specifies whether the child process should start with a copy of
