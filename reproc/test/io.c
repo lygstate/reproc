@@ -1,6 +1,4 @@
-#include <reproc/drain.h>
-#include <reproc/reproc.h>
-
+#include "../examples/common.h"
 #include "assert.h"
 
 #define MESSAGE "reproc stands for REdirected PROCess"
@@ -8,7 +6,7 @@
 static void io()
 {
   int r = -1;
-  const char *argv[] = { RESOURCE_DIRECTORY "/io", NULL };
+  const char *argv[] = { get_executable("/io"), NULL };
   reproc_options options = { 0 };
   char *out = NULL;
 
@@ -38,12 +36,13 @@ static void io()
   reproc_destroy(process);
 
   reproc_free(out);
+  reproc_free(argv[0]);
 }
 
 static void timeout(void)
 {
   int r = -1;
-  const char *argv[] = { RESOURCE_DIRECTORY "/io", NULL };
+  const char *argv[] = { get_executable("/io"), NULL };
   reproc_options options = { 0 };
   reproc_event_source source = { NULL, REPROC_EVENT_OUT | REPROC_EVENT_ERR,
                                  0 };
@@ -65,6 +64,7 @@ static void timeout(void)
   ASSERT_OK(r);
 
   reproc_destroy(process);
+  reproc_free(argv[0]);
 }
 
 int main(void)

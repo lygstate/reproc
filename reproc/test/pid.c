@@ -1,14 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <reproc/drain.h>
-#include <reproc/reproc.h>
-
+#include "../examples/common.h"
 #include "assert.h"
 
 int main(void)
 {
-  const char *argv[] = { RESOURCE_DIRECTORY "/pid", NULL };
+  const char *argv[] = { get_executable("/pid"), NULL };
   char *output = NULL;
   reproc_sink sink = reproc_sink_string(&output);
   int r = -1;
@@ -35,4 +33,5 @@ int main(void)
 
   reproc_destroy(process);
   reproc_free(output);
+  reproc_free(argv[0]);
 }

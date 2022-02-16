@@ -190,6 +190,9 @@ function(reproc_common TARGET LANGUAGE NAME DIRECTORY)
 
     target_link_libraries(${TARGET} PRIVATE -fsanitize=address,undefined)
   endif()
+  if(UNIX)
+    target_link_libraries(${TARGET} PRIVATE -ldl)
+  endif()
 endfunction()
 
 function(reproc_library TARGET LANGUAGE)
@@ -351,10 +354,6 @@ function(reproc_test TARGET NAME LANGUAGE)
   set_tests_properties(${TARGET}-test-${NAME} PROPERTIES TIMEOUT 30)
 
   if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/resources/${NAME}.c)
-    target_compile_definitions(${TARGET}-test-${NAME} PRIVATE
-      RESOURCE_DIRECTORY="${CMAKE_CURRENT_BINARY_DIR}/resources"
-    )
-
     if (NOT TARGET ${TARGET}-resource-${NAME})
       add_executable(${TARGET}-resource-${NAME} resources/${NAME}.c)
       reproc_common(${TARGET}-resource-${NAME} C ${NAME} resources)
@@ -383,10 +382,6 @@ function(reproc_example TARGET NAME LANGUAGE)
   target_link_libraries(${TARGET}-example-${NAME} PRIVATE ${TARGET} ${OPT_DEPENDS})
 
   if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/resources/${NAME}.c)
-    target_compile_definitions(${TARGET}-example-${NAME} PRIVATE
-      RESOURCE_DIRECTORY="${CMAKE_CURRENT_BINARY_DIR}/resources"
-    )
-
     if (NOT TARGET ${TARGET}-resource-${NAME})
       add_executable(${TARGET}-resource-${NAME} resources/${NAME}.c)
       reproc_common(${TARGET}-resource-${NAME} C ${NAME} resources)

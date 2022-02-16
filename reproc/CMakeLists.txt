@@ -37,6 +37,8 @@ target_sources(reproc PRIVATE
   src/run.c
   src/strv.c
   src/utf.${PLATFORM}.c
+  src/util.c
+  src/util.${PLATFORM}.c
 )
 
 if(MSVC)
@@ -52,6 +54,7 @@ reproc_test(reproc io C)
 reproc_test(reproc overflow C)
 reproc_test(reproc path C)
 reproc_test(reproc stop C)
+reproc_test(reproc util C)
 reproc_test(reproc working-directory C)
 reproc_test(reproc pid C)
 

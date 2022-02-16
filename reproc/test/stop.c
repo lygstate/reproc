@@ -1,11 +1,10 @@
-#include <reproc/reproc.h>
-
+#include "../examples/common.h"
 #include "assert.h"
 
 static void stop(REPROC_STOP action, int status)
 {
   int r = -1;
-  const char *argv[] = { RESOURCE_DIRECTORY "/stop", NULL };
+  const char *argv[] = { get_executable("/stop"), NULL };
   reproc_options options = { 0 };
   reproc_stop_actions stop = { 0 };
 
@@ -26,6 +25,7 @@ static void stop(REPROC_STOP action, int status)
   ASSERT_EQ_INT(r, status);
 
   reproc_destroy(process);
+  reproc_free(argv[0]);
 }
 
 int main(void)

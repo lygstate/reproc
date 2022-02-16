@@ -1,10 +1,9 @@
-#include <reproc/run.h>
-
+#include "../examples/common.h"
 #include "assert.h"
 
 int main(void)
 {
-  const char *argv[] = { RESOURCE_DIRECTORY "/path", NULL };
+  const char *argv[] = { get_executable("/path"), NULL };
   int r = -1;
   reproc_options options = { 0 };
   FILE *file = NULL;
@@ -43,4 +42,5 @@ int main(void)
   ASSERT_EQ_STR(string, argv[0]);
 
   free(string);
+  reproc_free(argv[0]);
 }

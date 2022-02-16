@@ -118,9 +118,3 @@ reproc_sink reproc_sink_discard(void)
 }
 
 const reproc_sink REPROC_SINK_NULL = { sink_discard, NULL };
-
-void *reproc_free(void *ptr)
-{
-  free(ptr);
-  return NULL;
-}
