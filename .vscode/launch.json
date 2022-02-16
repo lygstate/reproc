@@ -1,0 +1,73 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "(gdb) Windows 启动",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/x64-win32-pe-mingw-11-debug/reproc++/examples/drain.exe",
+      "args": ["cmake", "--help"],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [
+        {
+          "name": "PATH",
+          "value": "${env:PATH};C:/CI-Tools/msys64/mingw64/bin/"
+        }
+      ],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "miDebuggerPath": "C:/CI-Tools/msys64/mingw64/bin/gdb.exe",
+      "setupCommands": [
+          {
+              "description": "为 gdb 启用整齐打印",
+              "text": "-enable-pretty-printing",
+              "ignoreFailures": true
+          },
+          {
+              "description":  "将反汇编风格设置为 Intel",
+              "text": "-gdb-set disassembly-flavor intel",
+              "ignoreFailures": true
+          }
+      ]
+    },
+    {
+      "name": "(gdb) Linux 启动",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/reproc/test/argv",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${fileDirname}",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ]
+    },
+    {
+      "name": "(msvc) Windows 启动",
+      "type": "cppvsdbg",
+      "request": "launch",
+      //"program": "${workspaceFolder}/build/i686-pc-windows-msvc-10-debug/reproc/test/argv.exe",
+      // "program": "${workspaceFolder}/build/i686-pc-windows-msvc-10-debug/reproc/test/util.exe",
+      "program": "${workspaceFolder}/build/i686-pc-windows-msvc-10-debug/reproc/examples/poll.exe",
+      // "program": "${workspaceFolder}/build/i686-pc-windows-msvc-10-debug/reproc/test/stop.exe",
+      // "program": "${workspaceFolder}/build/i686-pc-windows-msvc-14-debug/reproc/examples/poll.exe",
+      // "program": "${workspaceFolder}/build/x64-pc-windows-msvc-14-debug/reproc/examples/poll.exe",
+      // "program": "${workspaceFolder}/build/i686-pc-windows-msvc-14-debug/reproc/test/io.exe",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}/",
+      "console": "externalTerminal"
+    },
+  ]
+}

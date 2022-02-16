@@ -1,0 +1,9 @@
+{
+  "C_Cpp.autoAddFileAssociations": false,
+  "cmake.configureArgs": [
+    "-DREPROC_TEST=ON",
+    "-DREPROC_EXAMPLES=ON",
+    "-DREPROC_DEVELOP=ON"
+  ],
+  "cmake.buildDirectory": "${workspaceRoot}/build/${buildKitTriple}-${buildKitVersionMajor}-${variant:buildType}"
+}
