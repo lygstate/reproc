@@ -223,6 +223,7 @@ int reproc_start(reproc_t *process,
   process_options.env.behavior = options.env.behavior;
   process_options.env.extra = options.env.extra;
   process_options.working_directory = options.working_directory,
+  process_options.show_console_window = options.show_console_window;
   process_options.handle.in = child.in;
   process_options.handle.out = child.out,
   process_options.handle.err = child.err,

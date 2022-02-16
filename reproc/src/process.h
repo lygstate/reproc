@@ -34,6 +34,10 @@ struct process_options {
     handle_type err;
     handle_type exit;
   } handle;
+  // Default, the child process console are redirect to parent
+  // if show_console_window, then a newly create window are used to
+  // show the child console.
+  bool show_console_window;
 };
 
 // Spawns a child process that executes the command stored in `argv`.

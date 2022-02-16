@@ -49,6 +49,7 @@ static reproc_options reproc_options_from(const options &options, bool fork)
 {
   return {
     options.working_directory,
+    options.show_console_window,
     { static_cast<REPROC_ENV>(options.env.behavior), options.env.extra.data() },
     { reproc_redirect_from(options.redirect.in),
       reproc_redirect_from(options.redirect.out),
