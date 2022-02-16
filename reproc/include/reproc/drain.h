@@ -69,11 +69,6 @@ REPROC_EXPORT reproc_sink reproc_sink_string(char **output);
 /*! Discards the output of a process. */
 REPROC_EXPORT reproc_sink reproc_sink_discard(void);
 
-/*! Calls `free` on `ptr` and returns `NULL`. Use this function to free memory
-allocated by `reproc_sink_string`. This avoids issues with allocating across
-module (DLL) boundaries on Windows. */
-REPROC_EXPORT void *reproc_free(void *ptr);
-
 #ifdef __cplusplus
 }
 #endif

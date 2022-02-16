@@ -1,10 +1,9 @@
-#include <reproc/run.h>
-
+#include "../examples/common.h"
 #include "assert.h"
 
 int main(void)
 {
-  const char *argv[] = { RESOURCE_DIRECTORY "/argv", "\"argument 1\"",
+  const char *argv[] = { get_executable("/argv"), "\"argument 1\"",
                          "\"argument 2\"", NULL };
   char *output = NULL;
   reproc_sink sink = reproc_sink_string(&output);
@@ -34,4 +33,5 @@ int main(void)
   ASSERT_EQ_SIZE(strlen(current), (size_t) 0);
 
   reproc_free(output);
+  reproc_free(argv[0]);
 }

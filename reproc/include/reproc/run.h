@@ -2,6 +2,7 @@
 
 #include <reproc/drain.h>
 #include <reproc/reproc.h>
+#include <reproc/util.h>
 
 #ifdef __cplusplus
 extern "C" {

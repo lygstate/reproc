@@ -1,10 +1,9 @@
-#include <reproc/run.h>
-
+#include "../examples/common.h"
 #include "assert.h"
 
 int main(void)
 {
-  const char *argv[] = { RESOURCE_DIRECTORY "/overflow", NULL };
+  const char *argv[] = { get_executable("/overflow"), NULL };
   char *output = NULL;
   reproc_sink sink = reproc_sink_string(&output);
   int r = -1;
@@ -15,4 +14,5 @@ int main(void)
   ASSERT(output != NULL);
 
   reproc_free(output);
+  reproc_free(argv[0]);
 }

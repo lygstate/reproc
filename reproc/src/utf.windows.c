@@ -39,3 +39,22 @@ wchar_t *utf16_from_utf8(const char *string, int size)
 
   return wstring;
 }
+
+char *utf8_from_utf16(const wchar_t *src, int src_length, int *out_length)
+{
+  int length = 0;
+  char *output_buffer = NULL;
+
+  ASSERT(src);
+  length = WideCharToMultiByte(CP_UTF8, 0, src, src_length, 0, 0, NULL, NULL);
+  output_buffer = (char *) malloc((size_t)(length + 1) * sizeof(char));
+  if (output_buffer) {
+    WideCharToMultiByte(CP_UTF8, 0, src, src_length, output_buffer, length,
+                        NULL, NULL);
+    output_buffer[length] = '\0';
+  }
+  if (out_length) {
+    *out_length = length;
+  }
+  return output_buffer;
+}

@@ -11,3 +11,5 @@
 // Pass -1 as the size to have `utf16_from_utf8` calculate the size until (and
 // including) the first NUL terminator.
 wchar_t *utf16_from_utf8(const char *string, int size);
+
+char *utf8_from_utf16(const wchar_t *src, int src_length, int *out_length);

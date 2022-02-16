@@ -2,6 +2,7 @@
 
 #include <reproc/drain.h>
 #include <reproc/reproc.h>
+#include <reproc/util.h>
 
 // Shows the output of the given command using `reproc_drain`.
 int main(int argc, const char **argv)

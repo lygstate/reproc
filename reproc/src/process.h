@@ -5,6 +5,7 @@
 #include <stdbool.h>
 
 #include <reproc/reproc.h>
+#include <reproc/util.h>
 
 #if defined(_WIN32)
 typedef void *process_type; // `HANDLE`
