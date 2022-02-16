@@ -14,6 +14,27 @@
 #include "macro.h"
 #include "utf.h"
 
+static bool _reproc_is_windows_version_or_greator(WORD wVersion,
+                                                  WORD wServicePackMajor)
+{
+  OSVERSIONINFOEXW osvi = { 0 };
+  DWORDLONG const dwlConditionMask = VerSetConditionMask(
+      VerSetConditionMask(VerSetConditionMask(0, VER_MAJORVERSION,
+                                              VER_GREATER_EQUAL),
+                          VER_MINORVERSION, VER_GREATER_EQUAL),
+      VER_SERVICEPACKMAJOR, VER_GREATER_EQUAL);
+
+  osvi.dwOSVersionInfoSize = sizeof(osvi);
+  osvi.dwMajorVersion = HIBYTE(wVersion);
+  osvi.dwMinorVersion = LOBYTE(wVersion);
+  osvi.wServicePackMajor = wServicePackMajor;
+
+  return VerifyVersionInfoW(&osvi,
+                            VER_MAJORVERSION | VER_MINORVERSION |
+                                VER_SERVICEPACKMAJOR,
+                            dwlConditionMask) != FALSE;
+}
+
 const HANDLE PROCESS_INVALID = INVALID_HANDLE_VALUE; // NOLINT
 
 static const DWORD CREATION_FLAGS =
@@ -23,10 +44,7 @@ static const DWORD CREATION_FLAGS =
     CREATE_NEW_PROCESS_GROUP |
     // Create each child process with a Unicode environment as we accept any
     // UTF-16 encoded environment (including Unicode characters). Create each
-    CREATE_UNICODE_ENVIRONMENT |
-    // Create each child with an extended STARTUPINFOEXW structure so we can
-    // specify which handles should be inherited.
-    EXTENDED_STARTUPINFO_PRESENT;
+    CREATE_UNICODE_ENVIRONMENT;
 
 // Argument escaping implementation is based on the following blog post:
 // https://blogs.msdn.microsoft.com/twistylittlepassagesallalike/2011/04/23/everyone-quotes-command-line-arguments-the-wrong-way/
@@ -212,20 +230,10 @@ static LPPROC_THREAD_ATTRIBUTE_LIST setup_attribute_list(HANDLE *handles,
                                                          size_t num_handles)
 {
   int r = -1;
-  size_t i = 0;
   SIZE_T attribute_list_size = 0;
   LPPROC_THREAD_ATTRIBUTE_LIST attribute_list = NULL;
 
   ASSERT(handles);
-
-  // Make sure all the given handles can be inherited.
-  for (i = 0; i < num_handles; i++) {
-    r = SetHandleInformation(handles[i], HANDLE_FLAG_INHERIT,
-                             HANDLE_FLAG_INHERIT);
-    if (r == 0) {
-      return NULL;
-    }
-  }
 
   // Get the required size for `attribute_list`.
   r = InitializeProcThreadAttributeList(NULL, NUM_ATTRIBUTES, 0,
@@ -358,6 +366,7 @@ int process_start(HANDLE *process,
   LPSTARTUPINFOW startup_info_address = NULL;
   SECURITY_ATTRIBUTES do_not_inherit = { 0 };
   DWORD previous_error_mode = 0;
+  DWORD creation_flags = CREATION_FLAGS;
 
   ASSERT(process);
 
@@ -411,13 +420,27 @@ int process_start(HANDLE *process,
     num_handles--;
   }
 
-  attribute_list = setup_attribute_list(handles, num_handles);
-  if (attribute_list == NULL) {
-    r = -(int) GetLastError();
-    goto finish;
+  {
+    size_t i = 0;
+    // Make sure all the given handles can be inherited.
+    for (i = 0; i < num_handles; i++) {
+      r = SetHandleInformation(handles[i], HANDLE_FLAG_INHERIT,
+                              HANDLE_FLAG_INHERIT);
+      if (r == 0) {
+        r = -(int) GetLastError();
+        goto finish;
+      }
+    }
   }
 
-  extended_startup_info.StartupInfo.cb = sizeof(extended_startup_info);
+  if (_reproc_is_windows_version_or_greator(_WIN32_WINNT_VISTA, 0)) {
+    attribute_list = setup_attribute_list(handles, num_handles);
+    if (attribute_list == NULL) {
+      r = -(int) GetLastError();
+      goto finish;
+    }
+  }
+
   extended_startup_info.StartupInfo.hStdInput = options.handle.in;
   extended_startup_info.StartupInfo.hStdOutput = options.handle.out;
   extended_startup_info.StartupInfo.hStdError = options.handle.err;
@@ -441,8 +464,17 @@ int process_start(HANDLE *process,
   do_not_inherit.bInheritHandle = false;
   do_not_inherit.lpSecurityDescriptor = NULL;
 
+  if (_reproc_is_windows_version_or_greator(_WIN32_WINNT_VISTA, 0)) {
+    // Create each child with an extended STARTUPINFOEXW structure so we can
+    // specify which handles should be inherited.
+    creation_flags |= EXTENDED_STARTUPINFO_PRESENT;
+    extended_startup_info.StartupInfo.cb = sizeof(extended_startup_info);
+  } else {
+    extended_startup_info.StartupInfo.cb = sizeof(extended_startup_info.StartupInfo);
+  }
+
   r = CreateProcessW(NULL, command_line_wstring, &do_not_inherit,
-                     &do_not_inherit, true, CREATION_FLAGS, env_wstring,
+                     &do_not_inherit, true, creation_flags, env_wstring,
                      working_directory_wstring, startup_info_address, &info);
 
   SetErrorMode(previous_error_mode);
