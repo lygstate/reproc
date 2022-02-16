@@ -10,5 +10,12 @@
 
 int64_t now(void)
 {
-  return (int64_t) GetTickCount64();
+  LARGE_INTEGER count = { 0 };
+  LARGE_INTEGER freq = { 0 };
+  int64_t time_now = 0;
+  QueryPerformanceCounter(&count);
+  QueryPerformanceFrequency(&freq);
+  time_now = (count.QuadPart / freq.QuadPart) * 1000;
+  time_now += (count.QuadPart % freq.QuadPart) * 1000 / freq.QuadPart;
+  return time_now;
 }
