@@ -123,7 +123,7 @@ static size_t argument_escape(char *dest, const char *argument)
 
   *dest++ = '"';
 
-  return (size_t)(dest - begin);
+  return (size_t) (dest - begin);
 }
 
 static char *argv_join(const char *const *argv)
@@ -472,8 +472,18 @@ finish:
 
 int process_pid(process_type process)
 {
+  DWORD pid = 0;
   ASSERT(process);
-  return (int) GetProcessId(process);
+  pid = GetProcessId(process);
+  /*
+  If the function succeeds, the return value is the process identifier.
+  If the function fails, the return value is zero.
+  To get extended error information, call GetLastError.
+  */
+  if (pid == 0) {
+    return -(int) GetLastError();
+  }
+  return (int) pid;
 }
 
 int process_wait(HANDLE process)
