@@ -63,6 +63,9 @@ static int parent(const char *program)
 
       r = reproc_read(children[i].process, REPROC_STREAM_OUT, output,
                       sizeof(output));
+      if (r == REPROC_EWOULDBLOCK) {
+        continue;
+      }
       if (r == REPROC_EPIPE) {
         // `reproc_destroy` returns `NULL`. Event sources with their process set
         // to `NULL` are ignored by `reproc_poll`.
