@@ -4,12 +4,10 @@
   #error "_WIN32_WINNT must be greater than _WIN32_WINNT_VISTA (0x0600)"
 #endif
 
-#include "pipe.h"
-
 #include <limits.h>
 #include <stdlib.h>
-#include <windows.h>
-#include <winsock2.h>
+
+#include "pipe.windows.poll.h"
 
 #include "error.h"
 #include "handle.h"
@@ -267,7 +265,7 @@ int pipe_poll(pipe_event_source *sources, size_t num_sources, int timeout)
     pollfds[i].events = sources[i].interests;
   }
 
-  r = WSAPoll(pollfds, (ULONG) num_sources, timeout);
+  r = poll_win32(pollfds, (ULONG) num_sources, timeout);
   if (r < 0) {
     r = -WSAGetLastError();
     goto finish;
