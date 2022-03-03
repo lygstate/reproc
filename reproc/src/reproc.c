@@ -398,7 +398,6 @@ int reproc_poll(reproc_event_source *sources, size_t num_sources, int timeout)
     sources[earliest].events = REPROC_EVENT_DEADLINE;
     r = 1;
   } else if (r > 0) {
-    bool again = false;
     // Convert pipe events to process events.
     for (i = 0; i < num_pipes; i++) {
       if (pipes[i].pipe == PIPE_INVALID) {
@@ -422,54 +421,6 @@ int reproc_poll(reproc_event_source *sources, size_t num_sources, int timeout)
     for (i = 0; i < num_sources; i++) {
       r += sources[i].events > 0;
     }
-
-    // On Windows, when redirecting to sockets, we keep the child handles alive
-    // in the parent process (see `reproc_start`). We do this because Windows
-    // doesn't correctly flush redirected socket handles when a child process
-    // exits. This can lead to data loss where the parent process doesn't
-    // receive all output of the child process. To get around this, we keep an
-    // extra handle open in the parent process which we close correctly when we
-    // detect the child process has exited. Detecting whether a child process
-    // has exited happens via another inherited socket, but here there's no
-    // danger of data loss because no data is received over this socket.
-
-    for (i = 0; i < num_sources; i++) {
-      reproc_t *process = NULL;
-      if (!(sources[i].events & REPROC_EVENT_EXIT)) {
-        continue;
-      }
-
-      process = sources[i].process;
-
-      if (process->child.out == PIPE_INVALID &&
-          process->child.err == PIPE_INVALID) {
-        continue;
-      }
-
-      r = pipe_shutdown(process->child.out);
-      if (r < 0) {
-        goto finish;
-      }
-
-      r = pipe_shutdown(process->child.err);
-      if (r < 0) {
-        goto finish;
-      }
-
-      process->child.out = pipe_destroy(process->child.out);
-      process->child.err = pipe_destroy(process->child.err);
-      again = true;
-    }
-
-    // If we've closed handles, we poll again so we can include any new close
-    // events that occurred because we closed handles.
-
-    if (again) {
-      r = reproc_poll(sources, num_sources, timeout);
-      if (r < 0) {
-        goto finish;
-      }
-    }
   }
 
 finish:
@@ -484,7 +435,7 @@ int reproc_read(reproc_t *process,
                 size_t size)
 {
   pipe_type *pipe = NULL;
-  pipe_type child = 0;
+  pipe_type *child = NULL;
   int r = -1;
 
   ASSERT_EINVAL(process);
@@ -494,8 +445,8 @@ int reproc_read(reproc_t *process,
 
   pipe = stream == REPROC_STREAM_OUT ? &process->pipe.out
                                                 : &process->pipe.err;
-  child = stream == REPROC_STREAM_OUT ? process->child.out
-                                                : process->child.err;
+  child = stream == REPROC_STREAM_OUT ? &process->child.out
+                                                : &process->child.err;
 
   if (*pipe == PIPE_INVALID) {
     return REPROC_EPIPE;
@@ -505,11 +456,24 @@ int reproc_read(reproc_t *process,
   // `reproc_poll` which closes the extra handles we keep open when the child
   // process exits. If we don't, `pipe_read` will block forever because the
   // extra handles we keep open in the parent would never be closed.
-  if (child != PIPE_INVALID) {
-    int event = stream == REPROC_STREAM_OUT ? REPROC_EVENT_OUT
+  if (*child != PIPE_INVALID) {
+    // On Windows, when redirecting to sockets, we keep the child handles alive
+    // in the parent process (see `reproc_start`). We do this because Windows
+    // doesn't correctly flush redirected socket handles when a child process
+    // exits. This can lead to data loss where the parent process doesn't
+    // receive all output of the child process. To get around this, we keep an
+    // extra handle open in the parent process which we close correctly when we
+    // detect the child process has exited. Detecting whether a child process
+    // has exited happens via another inherited socket, but here there's no
+    // danger of data loss because no data is received over this socket.
+    int interests = stream == REPROC_STREAM_OUT ? REPROC_EVENT_OUT
                                             : REPROC_EVENT_ERR;
-    reproc_event_source source = { process, event, 0 };
+    reproc_event_source source = { process, interests, 0 };
     r = reproc_poll(&source, 1, process->nonblocking ? 0 : REPROC_INFINITE);
+    if (source.events & REPROC_EVENT_EXIT) {
+      pipe_shutdown(*child);
+      *child = pipe_destroy(*child);
+    }
     if (r <= 0) {
       return r == 0 ? REPROC_EWOULDBLOCK : r;
     }
