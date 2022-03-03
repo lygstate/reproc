@@ -6,11 +6,25 @@
 #include "error.h"
 #include "macro.h"
 
+static int
+reproc_drain_single(reproc_t *process, reproc_sink sink, REPROC_STREAM stream)
+{
+  uint8_t buffer[4096];
+  size_t bytes_read = 0;
+  int r = reproc_read(process, stream, buffer, ARRAY_SIZE(buffer));
+  if (r < 0 && r != REPROC_EPIPE) {
+    return r;
+  }
+
+  bytes_read = r == REPROC_EPIPE ? 0 : (size_t) r;
+
+  return sink.function(stream, buffer, bytes_read, sink.context);
+}
+
 int reproc_drain(reproc_t *process, reproc_sink out, reproc_sink err)
 {
   const uint8_t initial = 0;
   int r = -1;
-  uint8_t buffer[4096];
 
   ASSERT_EINVAL(process);
   ASSERT_EINVAL(out.function);
@@ -32,12 +46,10 @@ int reproc_drain(reproc_t *process, reproc_sink out, reproc_sink err)
   }
 
   for (;;) {
+    int r_out = 0;
+    int r_err = 0;
     reproc_event_source source = { process, REPROC_EVENT_OUT | REPROC_EVENT_ERR,
                                    0 };
-    REPROC_STREAM stream = REPROC_STREAM_IN;
-    size_t bytes_read = 0;
-    reproc_sink sink;
-
     r = reproc_poll(&source, 1, REPROC_INFINITE);
     if (r < 0) {
       r = r == REPROC_EPIPE ? 0 : r;
@@ -49,19 +61,22 @@ int reproc_drain(reproc_t *process, reproc_sink out, reproc_sink err)
       break;
     }
 
-    stream = source.events & REPROC_EVENT_OUT ? REPROC_STREAM_OUT
-                                                            : REPROC_STREAM_ERR;
-
-    r = reproc_read(process, stream, buffer, ARRAY_SIZE(buffer));
-    if (r < 0 && r != REPROC_EPIPE) {
+    if (source.events & (REPROC_EVENT_OUT | REPROC_EVENT_EXIT)) {
+      r_out = reproc_drain_single(process, out, REPROC_STREAM_OUT);
+    }
+    if (source.events & (REPROC_EVENT_ERR | REPROC_EVENT_EXIT)) {
+      r_err = reproc_drain_single(process, err, REPROC_STREAM_ERR);
+    }
+    r = 0;
+    if (r_out != 0 || r_err != 0) {
+      r = r_out != 0 ? r_out : r_err;
+    }
+    if (r != 0) {
       break;
     }
-
-    bytes_read = r == REPROC_EPIPE ? 0 : (size_t) r;
-    sink = stream == REPROC_STREAM_OUT ? out : err;
-
-    r = sink.function(stream, buffer, bytes_read, sink.context);
-    if (r != 0) {
+    if ((source.events & REPROC_EVENT_EXIT) &&
+        !(source.events & (REPROC_EVENT_OUT | REPROC_EVENT_ERR))) {
+      /* Only the exit event leave behind */
       break;
     }
   }

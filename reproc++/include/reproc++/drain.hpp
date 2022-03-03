@@ -8,6 +8,22 @@
 
 namespace reproc {
 
+template <typename Sink>
+std::error_code drain_single(process &process, Sink sink, stream stream)
+{
+  static constexpr size_t BUFFER_SIZE = 4096;
+  uint8_t buffer[BUFFER_SIZE] = {};
+  size_t bytes_read = 0;
+  std::error_code ec;
+  std::tie(bytes_read, ec) = process.read(stream, buffer, BUFFER_SIZE);
+  if (ec && ec != error::broken_pipe) {
+    return ec;
+  }
+  bytes_read = ec == error::broken_pipe ? 0 : bytes_read;
+  ec = sink(stream, buffer, bytes_read);
+  return ec;
+}
+
 /*!
 `reproc_drain` but takes lambdas as sinks. Return an error code from a sink to
 break out of `drain` early. `out` and `err` expect the following signature:
@@ -36,9 +52,6 @@ std::error_code drain(process &process, Out &&out, Err &&err)
     return ec;
   }
 
-  static constexpr size_t BUFFER_SIZE = 4096;
-  uint8_t buffer[BUFFER_SIZE] = {};
-
   for (;;) {
     int events = 0;
     std::tie(events, ec) = process.poll(event::out | event::err, infinite);
@@ -51,26 +64,23 @@ std::error_code drain(process &process, Out &&out, Err &&err)
       ec = std::make_error_code(std::errc::timed_out);
       break;
     }
-
-    stream stream = events & event::out ? stream::out : stream::err;
-
-    size_t bytes_read = 0;
-    std::tie(bytes_read, ec) = process.read(stream, buffer, BUFFER_SIZE);
-    if (ec && ec != error::broken_pipe) {
+    std::error_code ec_out;
+    if (events & (event::out | event::exit)) {
+      ec_out = drain_single(process, out, stream::out);
+    }
+    std::error_code ec_err;
+    if (events & (event::err | event::exit)) {
+      ec_err = drain_single(process, err, stream::err);
+    }
+    ec.clear();
+    if (ec_out || ec_err) {
+      ec = ec_out ? ec_out : ec_err;
+    }
+    if (ec) {
       break;
     }
-
-    bytes_read = ec == error::broken_pipe ? 0 : bytes_read;
-
-    // This used to be `auto &sink = stream == stream::out ? out : err;` but
-    // that doesn't actually work if `out` and `err` are not the same type.
-    if (stream == stream::out) {
-      ec = out(stream, buffer, bytes_read);
-    } else {
-      ec = err(stream, buffer, bytes_read);
-    }
-
-    if (ec) {
+    if ((events & event::exit) && !(events & (event::out | event::err))) {
+      /* Only the exit event leave behind */
       break;
     }
   }
