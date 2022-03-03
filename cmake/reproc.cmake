@@ -348,6 +348,7 @@ function(reproc_test TARGET NAME LANGUAGE)
   endif()
 
   add_test(NAME ${TARGET}-test-${NAME} COMMAND ${TARGET}-test-${NAME})
+  set_tests_properties(${TARGET}-test-${NAME} PROPERTIES TIMEOUT 30)
 
   if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/resources/${NAME}.c)
     target_compile_definitions(${TARGET}-test-${NAME} PRIVATE
