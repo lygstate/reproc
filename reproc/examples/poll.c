@@ -25,7 +25,7 @@ static inline void millisleep(long ms)
 
 #include <reproc/reproc.h>
 
-enum { NUM_CHILDREN = 20 };
+enum { NUM_CHILDREN = 1024 };
 
 static int parent(const char *program)
 {
