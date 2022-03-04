@@ -19,6 +19,12 @@ const SOCKET PIPE_INVALID = INVALID_SOCKET;
 
 const short PIPE_EVENT_IN = POLLIN;
 const short PIPE_EVENT_OUT = POLLOUT;
+#pragma comment(lib, "advapi32.lib")
+#define RtlGenRandom SystemFunction036
+DECLSPEC_IMPORT BOOLEAN WINAPI RtlGenRandom(
+  PVOID RandomBuffer,
+  ULONG RandomBufferLength
+);
 
 // Inspired by https://gist.github.com/geertj/4325783.
 static int socketpair(int domain, int type, int protocol, SOCKET *out)
@@ -26,54 +32,73 @@ static int socketpair(int domain, int type, int protocol, SOCKET *out)
   SOCKET server = PIPE_INVALID;
   SOCKET pair[] = { PIPE_INVALID, PIPE_INVALID };
   int r = -1;
-  SOCKADDR_STORAGE name = { 0 };
+  union {
+    struct sockaddr_in inaddr;
+    SOCKADDR_STORAGE addr;
+  } name = { 0 };
   int size = sizeof(name);
   SOCKADDR_IN localhost = { 0 };
   struct {
     WSAPROTOCOL_INFOW data;
     int size;
   } info = { { 0 }, sizeof(WSAPROTOCOL_INFOW) };
-
+  int reuse = 1;
+  uint16_t loopback_increment = rand() & 0xFFFF;
+  uint32_t loopback_address = INADDR_LOOPBACK + (1 << 16);
+  RtlGenRandom(&loopback_increment, sizeof(loopback_increment));
+  // Add randome value for loopback address for
+  // avoid address/port conflict
+  // TODO: try multiple times
+  loopback_address += loopback_increment;
   ASSERT(out);
 
   server = WSASocketW(AF_INET, SOCK_STREAM, 0, NULL, 0, 0);
   if (server == INVALID_SOCKET) {
-    r = -WSAGetLastError();
-    goto finish;
+    goto error;
   }
 
+  /* set SO_REUSEADDR option to avoid leaking some windows resource.
+   * Windows System Error 10049, "Event ID 4226 TCP/IP has reached
+   * the security limit imposed on the number of concurrent TCP connect
+   * attempts."  Bleah.
+   */
+  if (setsockopt(server, SOL_SOCKET, SO_REUSEADDR, (char *) &reuse,
+                 (socklen_t) sizeof(reuse)) < 0) {
+    goto error;
+  }
   localhost.sin_family = AF_INET;
-  localhost.sin_addr.S_un.S_addr = htonl(INADDR_LOOPBACK);
+  localhost.sin_addr.S_un.S_addr = htonl(loopback_address);
   localhost.sin_port = 0;
 
   r = bind(server, (SOCKADDR *) &localhost, sizeof(localhost));
   if (r < 0) {
-    r = -WSAGetLastError();
-    goto finish;
+    goto error;
   }
 
   r = listen(server, 1);
   if (r < 0) {
-    r = -WSAGetLastError();
-    goto finish;
+    goto error;
   }
 
   r = getsockname(server, (SOCKADDR *) &name, &size);
   if (r < 0) {
-    r = -WSAGetLastError();
-    goto finish;
+    goto error;
   }
+
+  // win32 getsockname may only set the port number, p=0.0005.
+  // ( http://msdn.microsoft.com/library/ms738543.aspx ):
+  name.inaddr.sin_addr.s_addr = htonl(loopback_address);
+  name.inaddr.sin_family = AF_INET;
 
   pair[0] = WSASocketW(domain, type, protocol, NULL, 0, 0);
   if (pair[0] == INVALID_SOCKET) {
-    r = -WSAGetLastError();
-    goto finish;
+    goto error;
   }
 
   r = getsockopt(pair[0], SOL_SOCKET, SO_PROTOCOL_INFOW, (char *) &info.data,
                  &info.size);
   if (r < 0) {
-    goto finish;
+    goto error;
   }
 
   // We require the returned sockets to be usable as Windows file handles. This
@@ -89,10 +114,10 @@ static int socketpair(int domain, int type, int protocol, SOCKET *out)
     goto finish;
   }
 
+  /* TODO: how to make sure it's connected to the `server` just listen ? */
   r = connect(pair[0], (SOCKADDR *) &name, size);
   if (r < 0 && WSAGetLastError() != WSAEWOULDBLOCK) {
-    r = -WSAGetLastError();
-    goto finish;
+    goto error;
   }
 
   r = pipe_nonblocking(pair[0], false);
@@ -102,8 +127,7 @@ static int socketpair(int domain, int type, int protocol, SOCKET *out)
 
   pair[1] = accept(server, NULL, NULL);
   if (pair[1] == INVALID_SOCKET) {
-    r = -WSAGetLastError();
-    goto finish;
+    goto error;
   }
 
   out[0] = pair[0];
@@ -112,6 +136,8 @@ static int socketpair(int domain, int type, int protocol, SOCKET *out)
   pair[0] = PIPE_INVALID;
   pair[1] = PIPE_INVALID;
 
+error:
+  r = -WSAGetLastError();
 finish:
   pipe_destroy(server);
   pipe_destroy(pair[0]);
