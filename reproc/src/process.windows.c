@@ -23,10 +23,7 @@ static const DWORD CREATION_FLAGS =
     CREATE_NEW_PROCESS_GROUP |
     // Create each child process with a Unicode environment as we accept any
     // UTF-16 encoded environment (including Unicode characters). Create each
-    CREATE_UNICODE_ENVIRONMENT |
-    // Create each child with an extended STARTUPINFOEXW structure so we can
-    // specify which handles should be inherited.
-    EXTENDED_STARTUPINFO_PRESENT;
+    CREATE_UNICODE_ENVIRONMENT;
 
 // Argument escaping implementation is based on the following blog post:
 // https://blogs.msdn.microsoft.com/twistylittlepassagesallalike/2011/04/23/everyone-quotes-command-line-arguments-the-wrong-way/
@@ -180,6 +177,113 @@ static size_t env_join_size(const char *const *env)
   return joined_size;
 }
 
+typedef BOOL(WINAPI *InitializeProcThreadAttributeListFunction)(
+    LPPROC_THREAD_ATTRIBUTE_LIST lpAttributeList,
+    DWORD dwAttributeCount,
+    DWORD dwFlags,
+    PSIZE_T lpSize);
+
+typedef BOOL(WINAPI *UpdateProcThreadAttributeFunction)(
+    LPPROC_THREAD_ATTRIBUTE_LIST lpAttributeList,
+    DWORD dwFlags,
+    DWORD_PTR Attribute,
+    PVOID lpValue,
+    SIZE_T cbSize,
+    PVOID lpPreviousValue,
+    PSIZE_T lpReturnSize);
+
+typedef VOID(WINAPI *DeleteProcThreadAttributeListFunction)(
+    LPPROC_THREAD_ATTRIBUTE_LIST lpAttributeList);
+
+static InitializeProcThreadAttributeListFunction
+    pInitializeProcThreadAttributeList = /* NOLINT */
+    NULL;
+
+static UpdateProcThreadAttributeFunction
+    pUpdateProcThreadAttribute = /* NOLINT */
+    NULL;
+
+static DeleteProcThreadAttributeListFunction
+    pDeleteProcThreadAttributeList = /* NOLINT */
+    NULL;
+
+static BOOL EnableDebugPrivilege(void)
+{
+  HANDLE hToken = INVALID_HANDLE_VALUE;
+  BOOL fOk = FALSE;
+  if (OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, &hToken)) {
+    TOKEN_PRIVILEGES tp;
+    tp.PrivilegeCount = 1;
+    LookupPrivilegeValue(NULL, SE_DEBUG_NAME, &tp.Privileges[0].Luid);
+    tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+
+    AdjustTokenPrivileges(hToken, FALSE, &tp, sizeof(tp), NULL, NULL);
+
+    fOk = (GetLastError() == ERROR_SUCCESS);
+    CloseHandle(hToken);
+  }
+  return fOk;
+}
+
+static void init_once(void)
+{
+  HANDLE kernel32 = GetModuleHandleW(L"kernel32.dll");
+  pInitializeProcThreadAttributeList =
+      (InitializeProcThreadAttributeListFunction) (uintptr_t)
+          GetProcAddress(kernel32, "InitializeProcThreadAttributeList");
+  pUpdateProcThreadAttribute = (UpdateProcThreadAttributeFunction) (uintptr_t)
+      GetProcAddress(kernel32, "UpdateProcThreadAttribute");
+  pDeleteProcThreadAttributeList =
+      (DeleteProcThreadAttributeListFunction) (uintptr_t)
+          GetProcAddress(kernel32, "DeleteProcThreadAttributeList");
+  EnableDebugPrivilege();
+}
+
+static uintptr_t init_once_flag = REPROC_ONCE_FLAG_INIT; // NOLINT
+
+static void wpInit()
+{
+  reproc_call_once(&init_once_flag, init_once);
+}
+
+static BOOL wpInitializeProcThreadAttributeList(
+    LPPROC_THREAD_ATTRIBUTE_LIST lpAttributeList,
+    DWORD dwAttributeCount,
+    DWORD dwFlags,
+    PSIZE_T lpSize)
+{
+  if (pInitializeProcThreadAttributeList != NULL) {
+    return pInitializeProcThreadAttributeList(lpAttributeList, dwAttributeCount,
+                                              dwFlags, lpSize);
+  }
+  return FALSE;
+}
+
+static BOOL
+wpUpdateProcThreadAttribute(LPPROC_THREAD_ATTRIBUTE_LIST lpAttributeList,
+                            DWORD dwFlags,
+                            DWORD_PTR Attribute,
+                            PVOID lpValue,
+                            SIZE_T cbSize,
+                            PVOID lpPreviousValue,
+                            PSIZE_T lpReturnSize)
+{
+  if (pUpdateProcThreadAttribute != NULL) {
+    return pUpdateProcThreadAttribute(lpAttributeList, dwFlags, Attribute,
+                                      lpValue, cbSize, lpPreviousValue,
+                                      lpReturnSize);
+  }
+  return FALSE;
+}
+
+static VOID
+wpDeleteProcThreadAttributeList(LPPROC_THREAD_ATTRIBUTE_LIST lpAttributeList)
+{
+  if (pDeleteProcThreadAttributeList != NULL) {
+    pDeleteProcThreadAttributeList(lpAttributeList);
+  }
+}
+
 static char *env_join(const char *const *env)
 {
   char *joined = NULL;
@@ -212,25 +316,19 @@ static LPPROC_THREAD_ATTRIBUTE_LIST setup_attribute_list(HANDLE *handles,
                                                          size_t num_handles)
 {
   int r = -1;
-  size_t i = 0;
   SIZE_T attribute_list_size = 0;
   LPPROC_THREAD_ATTRIBUTE_LIST attribute_list = NULL;
 
   ASSERT(handles);
 
-  // Make sure all the given handles can be inherited.
-  for (i = 0; i < num_handles; i++) {
-    r = SetHandleInformation(handles[i], HANDLE_FLAG_INHERIT,
-                             HANDLE_FLAG_INHERIT);
-    if (r == 0) {
-      return NULL;
-    }
+  // Get the required size for `attribute_list`.
+  r = wpInitializeProcThreadAttributeList(NULL, NUM_ATTRIBUTES, 0,
+                                          &attribute_list_size);
+  if (r == 0 && GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
+    return NULL;
   }
 
-  // Get the required size for `attribute_list`.
-  r = InitializeProcThreadAttributeList(NULL, NUM_ATTRIBUTES, 0,
-                                        &attribute_list_size);
-  if (r == 0 && GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
+  if (attribute_list_size == 0) {
     return NULL;
   }
 
@@ -240,19 +338,19 @@ static LPPROC_THREAD_ATTRIBUTE_LIST setup_attribute_list(HANDLE *handles,
     return NULL;
   }
 
-  r = InitializeProcThreadAttributeList(attribute_list, NUM_ATTRIBUTES, 0,
-                                        &attribute_list_size);
+  r = wpInitializeProcThreadAttributeList(attribute_list, NUM_ATTRIBUTES, 0,
+                                          &attribute_list_size);
   if (r == 0) {
     free(attribute_list);
     return NULL;
   }
 
   // Add the handles to be inherited to `attribute_list`.
-  r = UpdateProcThreadAttribute(attribute_list, 0,
-                                PROC_THREAD_ATTRIBUTE_HANDLE_LIST, handles,
-                                num_handles * sizeof(HANDLE), NULL, NULL);
+  r = wpUpdateProcThreadAttribute(attribute_list, 0,
+                                  PROC_THREAD_ATTRIBUTE_HANDLE_LIST, handles,
+                                  num_handles * sizeof(HANDLE), NULL, NULL);
   if (r == 0) {
-    DeleteProcThreadAttributeList(attribute_list);
+    wpDeleteProcThreadAttributeList(attribute_list);
     free(attribute_list);
     return NULL;
   }
@@ -358,6 +456,7 @@ int process_start(HANDLE *process,
   LPSTARTUPINFOW startup_info_address = NULL;
   SECURITY_ATTRIBUTES do_not_inherit = { 0 };
   DWORD previous_error_mode = 0;
+  DWORD creation_flags = CREATION_FLAGS;
 
   ASSERT(process);
 
@@ -366,6 +465,8 @@ int process_start(HANDLE *process,
   }
 
   ASSERT(argv[0] != NULL);
+
+  wpInit();
 
   // Join `argv` to a whitespace delimited string as required by
   // `CreateProcessW`.
@@ -411,13 +512,27 @@ int process_start(HANDLE *process,
     num_handles--;
   }
 
-  attribute_list = setup_attribute_list(handles, num_handles);
-  if (attribute_list == NULL) {
-    r = -(int) GetLastError();
-    goto finish;
+  {
+    size_t i = 0;
+    // Make sure all the given handles can be inherited.
+    for (i = 0; i < num_handles; i++) {
+      r = SetHandleInformation(handles[i], HANDLE_FLAG_INHERIT,
+                               HANDLE_FLAG_INHERIT);
+      if (r == 0) {
+        r = -(int) GetLastError();
+        goto finish;
+      }
+    }
   }
 
-  extended_startup_info.StartupInfo.cb = sizeof(extended_startup_info);
+  if (reproc_windows_version_greator_or_equal(_WIN32_WINNT_VISTA, 0)) {
+    attribute_list = setup_attribute_list(handles, num_handles);
+    if (attribute_list == NULL) {
+      r = -(int) GetLastError();
+      goto finish;
+    }
+  }
+
   extended_startup_info.StartupInfo.hStdInput = options.handle.in;
   extended_startup_info.StartupInfo.hStdOutput = options.handle.out;
   extended_startup_info.StartupInfo.hStdError = options.handle.err;
@@ -444,8 +559,18 @@ int process_start(HANDLE *process,
   do_not_inherit.bInheritHandle = false;
   do_not_inherit.lpSecurityDescriptor = NULL;
 
+  if (reproc_windows_version_greator_or_equal(_WIN32_WINNT_VISTA, 0)) {
+    // Create each child with an extended STARTUPINFOEXW structure so we can
+    // specify which handles should be inherited.
+    creation_flags |= EXTENDED_STARTUPINFO_PRESENT;
+    extended_startup_info.StartupInfo.cb = sizeof(extended_startup_info);
+  } else {
+    extended_startup_info.StartupInfo.cb = sizeof(
+        extended_startup_info.StartupInfo);
+  }
+
   r = CreateProcessW(NULL, command_line_wstring, &do_not_inherit,
-                     &do_not_inherit, true, CREATION_FLAGS, env_wstring,
+                     &do_not_inherit, true, creation_flags, env_wstring,
                      working_directory_wstring, startup_info_address, &info);
 
   SetErrorMode(previous_error_mode);
@@ -458,13 +583,32 @@ int process_start(HANDLE *process,
   *process = info.hProcess;
   r = 0;
 
-finish:
-  free(command_line);
-  free(command_line_wstring);
-  free(env_wstring);
-  free(working_directory_wstring);
-  DeleteProcThreadAttributeList(attribute_list);
-  free(attribute_list);
+finish :
+
+{
+  size_t i = 0;
+  // Make sure all the given handles can not be inherited any more
+  for (i = 0; i < num_handles; i++) {
+    SetHandleInformation(handles[i], HANDLE_FLAG_INHERIT, 0);
+  }
+}
+
+  if (command_line != NULL) {
+    free(command_line);
+  }
+  if (command_line_wstring != NULL) {
+    free(command_line_wstring);
+  }
+  if (env_wstring != NULL) {
+    free(env_wstring);
+  }
+  if (working_directory_wstring != NULL) {
+    free(working_directory_wstring);
+  }
+  if (attribute_list != NULL) {
+    wpDeleteProcThreadAttributeList(attribute_list);
+    free(attribute_list);
+  }
   handle_destroy(info.hThread);
 
   return r < 0 ? r : 1;
