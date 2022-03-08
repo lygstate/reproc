@@ -663,7 +663,14 @@ reproc_t *reproc_destroy(reproc_t *process)
   ASSERT_RETURN(process, NULL);
 
   if (process->status == STATUS_IN_PROGRESS) {
-    reproc_stop(process, process->stop);
+    reproc_stop_actions stop;
+    stop.first.action = REPROC_STOP_WAIT;
+    stop.first.timeout = 100;
+    stop.second.action = REPROC_STOP_TERMINATE;
+    stop.second.timeout = 100;
+    stop.third.action = REPROC_STOP_KILL;
+    stop.third.timeout = 100;
+    reproc_stop(process, stop);
   }
 
   process_destroy(process->handle);
