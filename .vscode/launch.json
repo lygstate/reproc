@@ -59,15 +59,15 @@
       "request": "launch",
       //"program": "${workspaceFolder}/build/i686-pc-windows-msvc-10-debug/reproc/test/argv.exe",
       // "program": "${workspaceFolder}/build/i686-pc-windows-msvc-10-debug/reproc/test/util.exe",
-      "program": "${workspaceFolder}/build/i686-pc-windows-msvc-10-debug/reproc/examples/poll.exe",
-      // "program": "${workspaceFolder}/build/i686-pc-windows-msvc-10-debug/reproc/test/stop.exe",
+      // "program": "${workspaceFolder}/build/i686-pc-windows-msvc-10-debug/reproc/examples/poll.exe",
+      "program": "${workspaceFolder}/build/i686-pc-windows-msvc-14-debug/reproc/test/stop.exe",
       // "program": "${workspaceFolder}/build/i686-pc-windows-msvc-14-debug/reproc/examples/poll.exe",
       // "program": "${workspaceFolder}/build/x64-pc-windows-msvc-14-debug/reproc/examples/poll.exe",
       // "program": "${workspaceFolder}/build/i686-pc-windows-msvc-14-debug/reproc/test/io.exe",
       "args": [],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}/",
-      "console": "externalTerminal"
+      "console": "integratedTerminal"
     },
   ]
 }
