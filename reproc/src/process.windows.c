@@ -438,7 +438,7 @@ finish:
   return env_wstring;
 }
 
-int process_start(HANDLE *process,
+int process_start(reproc_t *process,
                   const char *const *argv,
                   struct process_options options)
 {
@@ -448,6 +448,7 @@ int process_start(HANDLE *process,
   wchar_t *working_directory_wstring = NULL;
   LPPROC_THREAD_ATTRIBUTE_LIST attribute_list = NULL;
   PROCESS_INFORMATION info = { PROCESS_INVALID, HANDLE_INVALID, 0, 0 };
+  PROCESS_INFORMATION *pi = NULL;
   int r = -1;
   HANDLE handles[] = { options.handle.exit, options.handle.in,
                        options.handle.out, options.handle.err };
@@ -465,6 +466,11 @@ int process_start(HANDLE *process,
   }
 
   ASSERT(argv[0] != NULL);
+
+  pi = malloc(sizeof(PROCESS_INFORMATION));
+  if (pi == NULL) {
+    return -ERROR_NOT_ENOUGH_SERVER_MEMORY;
+  }
 
   wpInit();
 
@@ -580,7 +586,10 @@ int process_start(HANDLE *process,
     goto finish;
   }
 
-  *process = info.hProcess;
+  process->handle = info.hProcess;
+  *pi = info;
+  process->extra = pi;
+  pi = NULL;
   r = 0;
 
 finish :
@@ -609,6 +618,9 @@ finish :
     wpDeleteProcThreadAttributeList(attribute_list);
     free(attribute_list);
   }
+  if (pi != NULL) {
+    free(pi);
+  }
   handle_destroy(info.hThread);
 
   return r < 0 ? r : 1;
@@ -630,16 +642,20 @@ int process_pid(process_type process)
   return (int) pid;
 }
 
-int process_wait(HANDLE process)
+int process_wait(HANDLE process, int timeout)
 {
   int r = -1;
   DWORD status = 0;
 
   ASSERT(process);
 
-  r = (int) WaitForSingleObject(process, INFINITE);
+  r = (int) WaitForSingleObject(process, (DWORD)timeout);
   if ((DWORD) r == WAIT_FAILED) {
     return -(int) GetLastError();
+  }
+  if ((DWORD) r == WAIT_TIMEOUT) {
+    r = TerminateProcess(process, (DWORD) REPROC_SIGKILL);
+    return r == 0 ? -(int) GetLastError() : 0;
   }
 
   r = GetExitCodeProcess(process, &status);
@@ -650,25 +666,33 @@ int process_wait(HANDLE process)
   // `GenerateConsoleCtrlEvent` causes a process to exit with this exit code.
   // Because `GenerateConsoleCtrlEvent` has roughly the same semantics as
   // `SIGTERM`, we map its exit code to `SIGTERM`.
-  if (status == 3221225786) {
+  if (status == 0xC000013A) {
     status = (DWORD) REPROC_SIGTERM;
   }
 
   return (int) status;
 }
 
-int process_terminate(HANDLE process)
+int process_terminate(reproc_t *process)
 {
   BOOL r = FALSE;
+  PROCESS_INFORMATION *pi = NULL;
 
-  ASSERT(process && process != PROCESS_INVALID);
+  ASSERT(process && process->handle != PROCESS_INVALID &&
+         process->extra != NULL);
 
+  pi = process->extra;
   // `GenerateConsoleCtrlEvent` can only be called on a process group. To call
   // `GenerateConsoleCtrlEvent` on a single child process it has to be put in
   // its own process group (which we did when starting the child process).
-  r = GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, GetProcessId(process));
-
-  return r == 0 ? -(int) GetLastError() : 0;
+  r = GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, pi->dwProcessId);
+  if (r == 0) {
+    return -(int) GetLastError();
+  }
+  // Try exit the windows ui event loop to exit the application
+  PostThreadMessageW(pi->dwThreadId, WM_QUIT, 0xC000013A, 0);
+  SetLastError(0);
+  return 0;
 }
 
 int process_kill(HANDLE process)

@@ -300,7 +300,7 @@ finish:
   return 0;
 }
 
-int process_start(pid_t *process,
+int process_start(reproc_t *process,
                   const char *const *argv,
                   struct process_options options)
 {
@@ -440,7 +440,7 @@ int process_start(pid_t *process,
     goto finish;
   }
 
-  *process = child;
+  process->handle = child;
   r = 0;
 
 finish:
@@ -462,8 +462,9 @@ int process_pid(process_type process)
   return process;
 }
 
-int process_wait(pid_t process)
+int process_wait(pid_t process, int timeout)
 {
+  (void)timeout;
   ASSERT(process != PROCESS_INVALID);
 
   int status = 0;
@@ -477,11 +478,11 @@ int process_wait(pid_t process)
   return parse_status(status);
 }
 
-int process_terminate(pid_t process)
+int process_terminate(reproc_t *process)
 {
-  ASSERT(process != PROCESS_INVALID);
+  ASSERT(process != NULL && process->handle != PROCESS_INVALID);
 
-  int r = kill(process, SIGTERM);
+  int r = kill(process->handle, SIGTERM);
   return r < 0 ? -errno : 0;
 }
 

@@ -9,30 +9,8 @@
 #include "init.h"
 #include "macro.h"
 #include "options.h"
-#include "pipe.h"
 #include "process.h"
 #include "redirect.h"
-
-struct reproc_t {
-  process_type handle;
-
-  struct {
-    pipe_type in;
-    pipe_type out;
-    pipe_type err;
-    pipe_type exit;
-  } pipe;
-
-  int status;
-  reproc_stop_actions stop;
-  int64_t deadline;
-  bool nonblocking;
-
-  struct {
-    pipe_type out;
-    pipe_type err;
-  } child;
-};
 
 enum {
   STATUS_NOT_STARTED = -1,
@@ -229,7 +207,7 @@ int reproc_start(reproc_t *process,
   process_options.handle.err = child.err,
   process_options.handle.exit = (handle_type) child.exit;
 
-  r = process_start(&process->handle, argv, process_options);
+  r = process_start(process, argv, process_options);
   if (r < 0) {
     goto finish;
   }
@@ -566,7 +544,7 @@ int reproc_wait(reproc_t *process, int timeout)
     return r == 0 ? REPROC_ETIMEDOUT : r;
   }
 
-  r = process_wait(process->handle);
+  r = process_wait(process->handle, timeout);
   if (r < 0) {
     return r;
   }
@@ -586,7 +564,7 @@ int reproc_terminate(reproc_t *process)
     return 0;
   }
 
-  return process_terminate(process->handle);
+  return process_terminate(process);
 }
 
 int reproc_kill(reproc_t *process)
