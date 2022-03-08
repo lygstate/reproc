@@ -139,8 +139,8 @@ static int child(void)
   }
 #endif
   srand(((unsigned int) getpid()));
-  for (i = 0; i < 50; ++i) {
-    ms = rand() % 20 * 4; // NOLINT
+  for (i = 0; i < 100; ++i) {
+    ms = rand() % 20 + 10; // NOLINT
     millisleep(ms);
     fprintf(stdout, "Process %i slept %i milliseconds stdout.\n", getpid(), ms);
     fprintf(stderr, "Process %i slept %i milliseconds stderr.\n", getpid(), ms);
