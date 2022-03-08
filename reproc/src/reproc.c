@@ -652,6 +652,9 @@ reproc_t *reproc_destroy(reproc_t *process)
   }
 
   process_destroy(process->handle);
+  if (process->extra != NULL) {
+    free(process->extra);
+  }
   pipe_destroy(process->pipe.in);
   pipe_destroy(process->pipe.out);
   pipe_destroy(process->pipe.err);
